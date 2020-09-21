@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta charset="utf-8">
+    <title>Visual Interface</title>
+    <meta name="author" content="NYU UGR Team">
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:400,300,400italic,700' rel='stylesheet' type='text/css'>
+    <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro" rel="stylesheet">
+    <link href="static/css/projection-style.css" rel="stylesheet" type="text/css">
+
+    <!-- D3.js and jQuery source -->
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <!-- <script type="text/javascript" src="static/js/d3.min.js"></script> -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <!-- <script type="text/javascript" src="static/js/jquery-3.3.1.min.js"></script> -->
+    <!-- AG Grid source -->
+    <script src="https://unpkg.com/@ag-grid-community/all-modules/dist/ag-grid-community.min.js"></script>
+    <!-- SVG scripts -->
+    <script type="text/javascript" src="static/js/main_graph.js"></script>
+    <script type="text/javascript" src="static/js/model_summary.js"></script>
+    <script type="text/javascript" src="static/js/direction_signs.js"></script>
+    <script type="text/javascript" src="static/js/anchor_graphs.js"></script>
+    <script type="text/javascript" src="static/js/square_graphs_simple.js"></script>
+    <script type="text/javascript" src="static/js/occ_bar.js"></script>
+    <script type="text/javascript" src="static/js/mini_graph.js"></script>
+    <script type="text/javascript" src="static/js/percentage_bar.js"></script>
+    <script type="text/javascript" src="static/js/squares.js"></script>
+    <script type="text/javascript" src="static/js/violin_graph.js"></script>
+    <script type="text/javascript" src="static/js/full_aggregation.js"></script>
+    <script type="text/javascript" src="static/js/d3-lasso.min.js"></script>
+    <script type="text/javascript" src="static/js/scatter.js"></script>
+    <script type="text/javascript" src="static/js/confusion_matrix.js"></script>
+    <script type="text/javascript" src="static/js/filter_summary.js"></script>
+    <script type="text/javascript" src="static/js/percentage_filter.js"></script>
+    <script type="text/javascript" src="static/js/feature_selector.js"></script>
+    <script type="text/javascript" src="static/js/advanced_comparison.js"></script>
+    <script type="text/javascript" src="static/js/legend.js"></script>
+
+  </head>
+
+  <body>
+    <div class="main">
+      <div class="left-sidebar-proj">
+        <header class="site-header-proj">
+          <h1><a href="/"> HOME </a></h1>
+        </header>
+        <nav class="left-nav-proj">
+          <ul>
+            <li><a href="projection"> GLOBAL </a></li>
+            <li><a href="individual"> LOCAL </a></li>
+          </ul>
+        </nav>
+      </div>
+      
+      <div class="right-side-proj" id="main-div">
+        
+        <div id="right-panel-proj">
+            <table class="proj-table">
+            <tr>
+              <th style="border-radius: 1px; width: 280px; padding-left: 30%;">
+                <span class="btn-group-proj" >
+                  <button id="median-button" class="proj-button"> Median </button>
+                  <button id="points-button" class="proj-button"> Points </button>
+                  <button id="density-button" class="proj-button"> Density </button>
+                  <button id="cf-button" class="proj-button"> CF </button>
+                  <button id="detail-button" class="proj-button"> Details </button>
+                </span>
+                <span class="btn-group-proj" style="margin-top: -20px;">
+                  <label class="control-label">Sort</label>
+                  <div>
+                    <select id="sort-dropdown" tabindex="-1" onchange="sortButtonHandle(this.value)">
+                      <option value="Default" selected="selected">Default</option>
+                      <option value="Mean-Dif">Mean Dif.</option>
+                      <option value="KL-Div">KL Div.</option>
+                    </select>        
+                  </div>
+                </span>
+              </th>
+            </tr>
+            <tr>
+              <td>
+                <div id="legend-div" style="position: fixed;">
+                </div>
+                <div id="distribution-div">
+                  Distribution
+                </div>
+              </td>
+            </tr>
+          </table>
+
+          <span id="middle-panel-proj">
+            <button id="filter-set-button" class="projection-buttons" onclick="addFilterSet()"> New Filter Set </button>
+          </span>
+
+        </div>
+          
+
+
+    <script>
+    
+      var no_features = {{no_features}};
+      var feature_selector_input = "{{feature_selector_input}}";
+      feature_selector_input = feature_selector_input.replace(/&#34;/g, "");
+      feature_selector_input = feature_selector_input.replace(/den/g, '\"den\"');
+      feature_selector_input = feature_selector_input.replace(/id/g, '\"id\"');
+      feature_selector_input = feature_selector_input.replace(/current/g, '\"current\"');
+      feature_selector_input = feature_selector_input.replace(/range/g, '\"range\"');
+
+      var percentage_filter_input = {{percentage_filter_input}};
+      console.log("percentage_filter_input", percentage_filter_input);
+      
+      var ft_names = "{{feature_names}}";
+      ft_names = ft_names.replace(/&#34;/g, "");
+      ft_names = ft_names.slice(1, ft_names.length-1).replace(/\s+/g, '');;
+      ft_names = ft_names.split(",");
+      var preproc_path = "{{preproc_path}}";
+      var dark_shade = "rgb(180, 177, 213)";
+      var light_shade = "white";
+
+      var txtFile;
+      var httpRequest;
+      var hhtpRequestViolin;
+      var httpRequestTable;
+      var curr_aggr_ids = [];
+      var selected_fts = [-1];
+      var curr_alg = "True";
+      var dim_red = "PCA";
+      var directionality = "True";
+      var pred_range = [[0,100],[0,100],[0,100]];
+      var confusion_mat = [["TP", "FP", "TN", "FN"],["TP", "FP", "TN", "FN"],["TP", "FP", "TN", "FN"]];
+      var filter_set_idx = 0;
+      var filter_set_idx_cmp = 0;
+      var doing_comparison = 0;
+      var left_mask = [];
+      var right_mask = [];
+      var n_filter_sets = 0;
+      var short_ft_names= [];
+      var max_ft_name_len = 15;
+
+      feature_selector_input = JSON.parse(feature_selector_input);
+      for (i=0; i<ft_names.length; i++){
+        feature_selector_input[i]['name'] = ft_names[i];
+        var short_ft_name = ft_names[i];
+        if (short_ft_name.length > max_ft_name_len){
+            short_ft_name = short_ft_name.substring(0,max_ft_name_len) + "...";
+        }
+        short_ft_names.push(short_ft_name);
+      }
+      
+      var ft_curr_range = [[],[],[]];
+      reset_ft_curr_ranges(0);
+      reset_ft_curr_ranges(1);
+      reset_ft_curr_ranges(2);
+
+
+
+      
+      function reset_ft_curr_ranges (idx){
+        // Generalize to many filter sets later
+        console.log("Reseting ranges at idx: ", idx);
+        var rangs = [];
+        for (i=0; i<ft_names.length; i++){
+          rangs.push (feature_selector_input[i]['range']); 
+        }
+        ft_curr_range[idx] = rangs;
+      }
+
+      function confusion_mat_2_state(curr_conf_mat){
+        // Order: [TP, FP, FN, TN]
+        var state = [];
+        if (curr_conf_mat.indexOf("TP") > -1){state.push(1);}
+        else {state.push(0);}
+        if (curr_conf_mat.indexOf("FP") > -1){state.push(1);}
+        else {state.push(0);}
+        if (curr_conf_mat.indexOf("FN") > -1){state.push(1);}
+        else {state.push(0);}
+        if (curr_conf_mat.indexOf("TN") > -1){state.push(1);}
+        else {state.push(0);}
+        return state;
+      }
+
+      function create_filter_set (idx){
+
+        var table = document.createElement("table");
+        var tr = document.createElement("tr");
+        var td_fil = document.createElement("td");
+        td_fil.style.verticalAlign = "top";
+
+        var filter_div = document.createElement("div");
+        filter_div.id = "filter-div-" + idx.toString();
+        filter_div.className = "filter-set";
+
+        var top_div = document.createElement("div");
+        top_div.id = "top-filter-div-" + idx.toString();
+        top_div.style.height = "40px";
+
+        var filter_title = document.createElement("text");
+        filter_title.innerHTML = "Filter Set " + idx.toString();
+
+        var reset_btn = document.createElement("button");
+        reset_btn.id = "reset-button-proj-" + idx.toString();
+        reset_btn.className = "reset-button-proj"
+        reset_btn.innerHTML = "Reset";
+        reset_btn.dataset.filtersetidx = idx.toString();
+        reset_btn.onclick = function(){resetFeatures(this);}
+
+        var percent_filt_div = document.createElement("div");
+        percent_filt_div.id = "percentage-filter-div-" + idx.toString();
+
+        var confmat_filt_div = document.createElement("div");
+        confmat_filt_div.id = "confusion-matrix-filter-div-" + idx.toString();
+
+        var ftrang_container = document.createElement("div");
+        ftrang_container.className = "feature-range-container-div";
+        ftrang_container.id = "feature-range-container-div-" + idx.toString();
+        ftrang_container.style.height = "calc(100vh - 400px)";
+        ftrang_container.style.overflowY = "auto";
+        ftrang_container.innerHTML = "Feature ranges";
+        ftrang_container.dataset.numSliders = 1;
+
+        var ftrang_filt_div = document.createElement("div");
+        ftrang_filt_div.id = "feature-range-filter-div-" + idx.toString() + "-1";
+
+        var ft_dropdown = document.createElement("select");
+        ft_dropdown.id = "feature-dropdown-" + idx.toString() + "-1";
+
+        var init_option = document.createElement("option");
+        init_option.value = "init" + idx.toString();
+        init_option.innerHTML = "Choose feature";
+        init_option.disabled = true;
+        init_option.selected = true;
+        ft_dropdown.appendChild(init_option);
+        ft_dropdown.value = "init";
+
+        top_div.appendChild(filter_title);
+        top_div.appendChild(reset_btn);
+
+        filter_div.appendChild(top_div);
+        filter_div.appendChild(percent_filt_div);
+        filter_div.appendChild(confmat_filt_div);
+
+        td_fil.appendChild(filter_div);
+
+        var td_rangs = document.createElement("td");
+        td_rangs.style.verticalAlign = "top";
+
+        var ftrang_slider = document.createElement("div");
+        ftrang_slider.id = "feature-range-slider-div-" + idx.toString() + "-1";
+        ftrang_slider.style.height = "60px";
+
+        ftrang_filt_div.appendChild(document.createElement("br"));
+        ftrang_filt_div.appendChild(ft_dropdown);
+        ftrang_filt_div.appendChild(ftrang_slider);
+
+        var ftrang_button = document.createElement("button");
+        ftrang_button.className = "projection-buttons";
+        ftrang_button.id = "feature-range-new-button-" + idx.toString();
+        ftrang_button.innerHTML = "+";
+        ftrang_button.dataset.idx = idx;
+        ftrang_button.onclick = function(){new_ft_range_slider(this);};
+        
+        ftrang_container.appendChild(ftrang_filt_div);
+        ftrang_container.appendChild(ftrang_button);
+
+        td_rangs.appendChild(ftrang_container);
+
+        tr.appendChild(td_fil);
+        tr.appendChild(td_rangs);
+
+        table.appendChild(tr);
+        if (idx==1){
+          table.style.float = "left";
+        }
+        else{
+          table.style.float = "right";
+        }
+        // table.style.borderRight = "1px solid black";
+        // table.style.marginLeft = "20px";
+
+        return table;
+      }
+
+      // wrapper to avoid duplicates
+      function draw_filters(conf_mat_state, idx){
+
+        // Confusion Matrix Order: [TP, FP, FN, TN]
+        var curr_matrix = document.getElementById("confusion-matrix-filter-div-"+idx.toString()).getElementsByClassName("confusionMat");
+        if (curr_matrix.length > 0){
+          curr_matrix[0].parentNode.removeChild(curr_matrix[0]);
+        }
+
+        // TODO: Feedback the data that is in the conf_matrix at the moment
+        var example_data = {'tn': 1, 'fp': 1, 'tp': 1, 'fn': 1};
+        confusion_matrix("#confusion-matrix-filter-div-"+idx.toString(), conf_mat_state, example_data, idx);
+
+        // Percentage Filter
+        var curr_percentage = document.getElementById("percentage-filter-div-"+idx.toString()).getElementsByClassName("percentageBar");
+        if (curr_percentage.length > 0){
+          curr_percentage[0].parentNode.removeChild(curr_percentage[0]);
+        }
+        percentage_bar("#percentage-filter-div-"+idx.toString(), pred_range[filter_set_idx], percentage_filter_input, idx);
+
+        draw_feature_dropdown(idx); 
+      }
+
+      // Feature selector dropdown
+      function draw_feature_dropdown(idx, slider_idx=1){
+        var ft_dropdown_opts = document.getElementsByClassName("ft-dropdown-option-"+idx.toString()+"-"+slider_idx.toString());
+        if (ft_dropdown_opts.length <= 1){
+          var ft_dropdown = document.getElementById("feature-dropdown-" + idx.toString() +"-"+slider_idx.toString());
+          ft_dropdown.dataset.filteridx = idx;
+          ft_dropdown.dataset.slideridx = slider_idx;
+          ft_dropdown.onchange = function () {draw_feature_selector(this);};
+          for (i=0; i<ft_names.length; i++){
+            var option = document.createElement("option");
+            option.text = short_ft_names[i];
+            option.value = i;
+            option.ftid = i;
+            option.className = "ft-dropdown-option-"+idx.toString()+"-"+slider_idx.toString();
+            option.parent_idx = idx;
+            ft_dropdown.add(option);
+          }
+        } 
+      }  
+
+      // wrapper to avoid duplicates
+      function draw_feature_selector(ft_option){
+        filter_set_idx = ft_option.dataset.filteridx;
+        var slider_idx = ft_option.dataset.slideridx;
+        console.log("DRAwing SlideR", filter_set_idx, slider_idx);
+        console.log("Feature selector idx:", ft_option.value);
+        var aFeature = feature_selector_input[ft_option.value];
+        aFeature['current'] = ft_curr_range[filter_set_idx][ft_option.value];
+        console.log("Drawing range slider", aFeature);
+        document.getElementById("feature-range-slider-div-"+filter_set_idx+"-"+slider_idx.toString()).innerHTML = "";
+        feature_selector("#feature-range-slider-div-"+filter_set_idx+"-"+slider_idx.toString(), aFeature, filter_set_idx, slider_idx);
+      }
+
+      function new_ft_range_slider (elem){
+        var idx = elem.dataset.idx;
+        var next_slider_idx = parseInt(document.getElementById("feature-range-container-div-" + idx.toString()).dataset.numSliders) + 1;
+        document.getElementById("feature-range-container-div-" + idx.toString()).dataset.numSliders = next_slider_idx;
+        console.log("NEW SLIDER", idx, next_slider_idx);
+
+        var ftrang_container = document.getElementById("feature-range-container-div-" + idx.toString());
+
+        var ftrang_filt_div = document.createElement("div");
+        ftrang_filt_div.id = "feature-range-filter-div-" + idx.toString() + "-" + next_slider_idx.toString();
+
+        var ft_dropdown = document.createElement("select");
+        ft_dropdown.id = "feature-dropdown-" + idx.toString() + "-" + next_slider_idx.toString();
+
+        var init_option = document.createElement("option");
+        init_option.value = "init" + idx.toString();
+        init_option.innerHTML = "Choose feature";
+        init_option.disabled = true;
+        init_option.selected = true;
+        ft_dropdown.appendChild(init_option);
+        ft_dropdown.value = "init";
+
+        var ftrang_slider = document.createElement("div");
+        ftrang_slider.id = "feature-range-slider-div-" + idx.toString() + "-" + next_slider_idx.toString();
+        ftrang_slider.style.height = "60px";
+
+        ftrang_filt_div.appendChild(document.createElement("br"));
+        ftrang_filt_div.appendChild(ft_dropdown);
+        ftrang_filt_div.appendChild(ftrang_slider);
+        ftrang_container.insertBefore(ftrang_filt_div, document.getElementById("feature-range-new-button-" + idx.toString()));
+
+        draw_feature_dropdown(idx, next_slider_idx);
+      }
+
+      function remove_filter_range(filter_idx_to_rm, slider_idx_to_rm, feature_idx_to_rm){
+        ft_curr_range[filter_idx_to_rm][feature_idx_to_rm] = feature_selector_input[feature_idx_to_rm]['range'];
+        var elem = document.querySelector("#feature-range-filter-div-" + filter_idx_to_rm.toString() + "-" + slider_idx_to_rm.toString());
+        elem.parentNode.removeChild(elem);
+        makeMainBackendRequest();
+      }
+
+      // Request to send feature list
+      function makeMainBackendRequest() {
+        httpRequest = new XMLHttpRequest();
+        if (!httpRequest) {
+          alert('Giving up :( Cannot create an XMLHTTP instance');
+          return false;
+        }
+        
+        // selected features
+        req_arr = [];
+
+        if (n_filter_sets > 1){
+          doing_comparison = 1;
+
+        }
+        
+        // If not doing comparison
+        if (doing_comparison == 0){
+          // TODO: make sure indexes are correct
+          filter_set_idx = 1;
+
+          // Check the features that have been moved from their original range and pass those indexes to the backend
+          var modified_range_idx = [];
+          for (var j=0; j<ft_names.length; j++){
+            if (ft_curr_range[filter_set_idx][j] != feature_selector_input[j]['range']){
+              modified_range_idx.push(j);
+            }
+          }
+          console.log("modified range indexes:", modified_range_idx);
+          
+          httpRequest.onreadystatechange = alertMainBackend;
+          httpRequest.open('GET', 'main_backend_req?selected_fts=['+req_arr+']&algorithm='+curr_alg + '&dim_red='+dim_red + '&directionality='+directionality + '&confusion_mat_1='+ confusion_mat[filter_set_idx] + '&pred_range_1='+ pred_range[filter_set_idx] + '&ft_curr_range_1='+ ft_curr_range[filter_set_idx] 
+            + '&modified_range_idx_1='+ modified_range_idx + '&filter_set_idx_1='+ filter_set_idx + '&doing_comparison='+ doing_comparison);
+          httpRequest.send();
+          return false;
+        }
+
+        // If doing comparison
+        // Repeat for both filter sets filter_set_idx and filter_set_idx_cmp
+        else {
+          filter_set_idx = 1;
+          filter_set_idx_cmp = 2;
+
+          // Check the features that have been moved from their original range and pass those indexes to the backend
+          var modified_range_idx_1 = [];
+          var modified_range_idx_2 = [];
+          for (var j=0; j<ft_names.length; j++){
+            if (ft_curr_range[filter_set_idx][j] != feature_selector_input[j]['range']){
+              modified_range_idx_1.push(j);
+            }
+            if (ft_curr_range[filter_set_idx_cmp][j] != feature_selector_input[j]['range']){
+              modified_range_idx_2.push(j);
+            }
+          }
+          console.log("modified range indexes:", modified_range_idx_1, modified_range_idx_2);
+          
+          httpRequest.onreadystatechange = alertMainBackend;
+          httpRequest.open('GET', 'main_backend_req?selected_fts=['+req_arr+']&algorithm='+curr_alg + '&dim_red='+dim_red + '&directionality='+directionality + '&confusion_mat_1='+ confusion_mat[filter_set_idx] + '&confusion_mat_2='+ confusion_mat[filter_set_idx_cmp] + '&pred_range_1='+ pred_range[filter_set_idx] + '&pred_range_2='+ pred_range[filter_set_idx_cmp] + '&ft_curr_range_1='+ ft_curr_range[filter_set_idx] + '&ft_curr_range_2='+ ft_curr_range[filter_set_idx_cmp] 
+            + '&modified_range_idx_1='+ modified_range_idx_1 + '&modified_range_idx_2='+ modified_range_idx_2 + '&filter_set_idx_1='+ filter_set_idx + '&filter_set_idx_2='+ filter_set_idx_cmp + '&doing_comparison='+ doing_comparison);
+          httpRequest.send();
+          return false;
+        }
+      }
+
+      // Bokeh middle panel
+      function alertMainBackend() {
+
+        if (httpRequest.readyState === XMLHttpRequest.OPENED){
+          document.getElementById("middle-panel-proj").style.display = "inline-block";
+          // document.getElementById("summary-div-1").innerHTML = "";
+          // if (n_filter_sets>1){ document.getElementById("summary-div-2").innerHTML = "";}
+          // add_loader(document.getElementById("middle-panel-proj"));    
+        }
+
+        else if (httpRequest.readyState === XMLHttpRequest.DONE) {
+          if (httpRequest.status === 200) {
+            //Do stuff with the response
+
+            var resp_arr = httpRequest.responseText;
+            var allData = JSON.parse(resp_arr);
+            console.log(allData);
+
+            // TODO: Do summary for matrix in place, and in correct index for the rest
+            // // TODO: Feedback the data that is in the conf_matrix at the moment
+            // var example_data = {'tn': 1, 'fp': 1, 'tp': 1, 'fn': 1};
+            // confusion_matrix("#confusion-matrix-filter-div-"+idx.toString(), conf_mat_state, example_data, idx);
+            
+            // draw_summary(allData[2],  allData[3], '#summary-div-1');
+            draw_conf_mat_numbers(allData[2], 1);
+            percentage_filter_input = allData[7];
+            console.log("percentage_filter_input", percentage_filter_input);
+            document.getElementById("percentage-filter-div-1").innerHTML = "";
+            percentage_bar("#percentage-filter-div-1", pred_range[1], allData[7], 1);
+
+            if (doing_comparison==1){
+              // draw_summary(allData[5],  allData[6], '#summary-div-2');
+              // TODO: draw total from summary somewhere else
+
+              draw_conf_mat_numbers(allData[5], 2);
+              document.getElementById("percentage-filter-div-2").innerHTML = "";
+              percentage_bar("#percentage-filter-div-2", pred_range[2], allData[8], 2);
+            }
+            
+            left_mask = allData[1];
+            right_mask = allData[4];
+            makeViolinRequest(left_mask, right_mask);
+
+            // Save the results
+
+          }
+          else {
+              alert('HttpRequest Error')
+          }
+        }
+      }
+
+      function draw_conf_mat_numbers(conf_nums, idx){
+        console.log("Drawing conf mat numbers", conf_nums);
+        document.getElementById("TP-text-"+idx.toString()).innerHTML = conf_nums.tp;
+        console.log(document.getElementById("TP-text-"+idx.toString()).innerHTML);
+        document.getElementById("FP-text-"+idx.toString()).innerHTML = conf_nums.fp;
+        document.getElementById("TN-text-"+idx.toString()).innerHTML = conf_nums.tn;
+        document.getElementById("FN-text-"+idx.toString()).innerHTML = conf_nums.fn;
+      }
+      
+      // Request from scatter plot to right panel violin plot
+      function makeViolinRequest(mask_1, mask_2="null", sort_val="Default") {
+        httpRequestViolin = new XMLHttpRequest();
+        if (!httpRequestViolin) {
+          alert('Giving up :( Cannot create an XMLHTTP instance');
+          return false;
+        }
+
+        var id_list_1 = [];
+        var id_list_2 = [];
+        for (var k=0; k<mask_1.length; k++){
+          if(mask_1[k]==1) id_list_1.push(k);
+        }
+        if (id_list_1.length<1) id_list_1=[-1];
+
+        if (mask_2 != "null"){
+          for (var k=0; k<mask_1.length; k++){
+            if(mask_2[k]==1) id_list_2.push(k);
+          }
+          if (id_list_2.length<1) id_list_2=[-1];
+        }
+        else {id_list_2="null";}
+
+        console.log("SORT BUTTON", sort_val);
+        // curr_aggr_ids = id_list;
+        httpRequestViolin.onreadystatechange = alertContentsViolin;
+        // httpRequestViolin.open('GET', 'violin_req?id_list='+curr_aggr_ids);  
+        httpRequestViolin.open('GET', 'violin_req?id_list_1=' + id_list_1 + "&id_list_2=" + id_list_2 + "&sort_val=" + sort_val);  
+        httpRequestViolin.send();
+        return false;
+      }
+
+      // Right panel violin plot
+      var resp_list;
+      function alertContentsViolin() {
+        if (httpRequestViolin.readyState === XMLHttpRequest.DONE) {
+          if (httpRequestViolin.status === 200) {
+            //Do stuff with the response
+            
+            var resp_arr = httpRequestViolin.responseText;
+            // --- Toggle Median Marker ---
+            var median_toggle = (document.getElementById("median-button").dataset.toggled == 1 );
+
+            // --- Toggle Points ---
+            var points_toggle = (document.getElementById("points-button").dataset.toggled == 1);
+
+            // --- Toggle Density --- 
+            var density_toggle = (document.getElementById("density-button").dataset.toggled == 1);
+
+            // --- Toggle Density --- 
+            var cf_toggle = (document.getElementById("cf-button").dataset.toggled == 1);
+
+            // --- Toggle Details --- 
+            var detail_toggle = (document.getElementById("detail-button").dataset.toggled == 1);
+
+            // --- Sort Features ---
+            // Done in backend (?)
+
+            // --- Monotonicity ---  
+
+            document.getElementById("distribution-div").innerHTML = "";
+            if (resp_arr!="-1"){
+              resp_list = JSON.parse(resp_arr);
+            }
+
+            draw_comparison(resp_list, "#distribution-div",
+              median_toggle, density_toggle, points_toggle,cf_toggle, detail_toggle);
+       
+          }
+          else {
+              alert('HttpRequest Error');
+          }
+        }
+      }
+
+      // Aggregation parameters buttons
+      function optionsButtonRequest(elem){
+        var tog = elem.dataset.toggled;        
+        if (tog==1) {
+          elem.style.backgroundColor = light_shade;
+          elem.dataset.toggled = 0;
+        }
+        else {
+          elem.style.backgroundColor = dark_shade;
+          elem.dataset.toggled = 1;
+        }
+        makeViolinRequest(left_mask, right_mask);
+      }
+
+      // Sort dropdown button
+      function sortButtonHandle(value){
+        makeViolinRequest(left_mask, right_mask, value);
+      }
+
+      // Reset button
+      function resetFeatures(elem, idx="null") {
+
+        if (idx=="null"){
+          filter_set_idx = parseInt(elem.dataset.filtersetidx);
+        }
+        else {
+          filter_set_idx = idx;
+        }
+        selected_fts = [-1];        
+        confusion_mat[filter_set_idx] = ["TP", "FP", "TN", "FN"];
+        pred_range[filter_set_idx] = [0,100];
+        doing_comparison = 0;
+        reset_ft_curr_ranges(filter_set_idx);
+
+        document.getElementById("feature-dropdown-" + filter_set_idx.toString() + "-1").value = "init";
+
+        var no_sliders = document.getElementById("feature-range-container-div-" + filter_set_idx.toString()).dataset.numSliders;
+        for (var i=2; i<=no_sliders; i++){
+          var elem = document.querySelector("#feature-range-filter-div-" + filter_set_idx.toString() + "-" + i.toString());
+          elem.parentNode.removeChild(elem);
+        }
+
+        draw_filters(confusion_mat_2_state(confusion_mat[filter_set_idx]), filter_set_idx);
+        document.getElementById("feature-range-slider-div-"+filter_set_idx+"-1").innerHTML = "";
+        makeMainBackendRequest();
+      }
+
+      function matrixTrigger(checked, text, elem){
+        console.log("elem calling matrix trigger:", elem.dataset.filteridx);
+        var filtersetidx = parseInt(elem.dataset.filteridx);
+        if (checked == true){
+          confusion_mat[filtersetidx].push(text);
+        } else {
+           confusion_mat[filtersetidx].splice(confusion_mat[filtersetidx].indexOf(text), 1);
+        }
+        filter_set_idx = filtersetidx;
+        makeMainBackendRequest();
+      }
+  
+      function addFilterSet(idx){
+
+        n_filter_sets+=1;
+
+        document.getElementById("middle-panel-proj").insertBefore(create_filter_set(n_filter_sets), 
+          document.getElementById("filter-set-button"));
+
+        if (n_filter_sets>=2) {
+          document.getElementById("filter-set-button").style.display = "none";
+        }
+        draw_filters(confusion_mat_2_state(confusion_mat[n_filter_sets]), n_filter_sets);
+
+        resetFeatures("null", n_filter_sets);
+      }
+
+      // Start global screen after instructions
+      function begin_glob(){
+
+        var right = document.getElementById("main-div");
+
+        median_btn = document.getElementById("median-button");
+        median_btn.onclick = function(){optionsButtonRequest(this);};
+        median_btn.style.backgroundColor = dark_shade;
+        median_btn.dataset.toggled = 1;
+
+        points_btn = document.getElementById("points-button");
+        points_btn.onclick = function(){optionsButtonRequest(this);};
+        points_btn.style.backgroundColor = light_shade;
+        points_btn.dataset.toggled = 0;
+
+        density_btn = document.getElementById("density-button");
+        density_btn.onclick = function(){optionsButtonRequest(this);};
+        density_btn.style.backgroundColor = dark_shade;
+        density_btn.dataset.toggled = 1;
+
+        cf_btn = document.getElementById("cf-button");
+        cf_btn.onclick = function(){optionsButtonRequest(this);};
+        cf_btn.style.backgroundColor = dark_shade;
+        cf_btn.dataset.toggled = 1;
+
+        detail_btn = document.getElementById("detail-button");
+        detail_btn.onclick = function(){optionsButtonRequest(this);};
+        detail_btn.style.backgroundColor = light_shade;
+        detail_btn.dataset.toggled = 0;
+
+        addFilterSet();
+      }
+
+      draw_legend("#legend-div");
+      begin_glob();
+
+
+    </script>
+
+  </body>
+
+</html>
