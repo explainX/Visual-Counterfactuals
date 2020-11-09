@@ -56,13 +56,13 @@ source env_explainx/bin/activate
 * Download explainx_pro code using the following.
 
 ```python
-git clone https://github.com/explainX/explainx_pro.git
+git clone https://github.com/explainX/explainx_cf.git
 ```
 
 * Run the following to install all required Python Libraries.
 
 ```python
-pip install -r explainx_pro/requirements.txt
+pip install flask flask_cors pyrebase pandas sklearn jupyter
 ```
 
 
