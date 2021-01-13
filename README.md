@@ -56,7 +56,7 @@ source env_explainx/bin/activate
 * Download explainx_pro code using the following.
 
 ```python
-git clone https://github.com/explainX/explainx_cf.git
+git clone https://github.com/explainX/explainx_counterfactuals.git
 ```
 
 * Run the following to install all required Python Libraries.
@@ -70,7 +70,6 @@ pip install flask flask_cors pyrebase pandas sklearn jupyter
 
 * Download the Jupyter file found [here](https://github.com/explainX/explainx_cf/blob/master/b%200.0.2%20counterfactuals_final.ipynb) and place it in **explainx** folder
 
-<img width="600" src="download_tutorial_file.png" alt="explainX.ai">
 
 * Run the following in the terminal to run Jupyter.
 
